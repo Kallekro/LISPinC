@@ -64,6 +64,6 @@ void readSexp (char* cs, ParseResult* parse_res, SexpHeap* heap);
 void readExp (char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
 void readSymbol (char* cs, size_t i, size_t len, ParseResult* parse_res);
 void readTail (char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
-void readSymbolAndTail(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
+void readThingAndTail(Sexp* thing, char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
 void readClose (char* cs, size_t i, size_t len, ParseResult* parse_res);
 #endif

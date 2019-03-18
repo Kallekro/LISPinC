@@ -206,19 +206,22 @@ void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* 
     }
     else if ('a' <= cs[i] && 'z' >= cs[i]) {
         readSymbol(cs, i, len, parse_res);
+        Sexp* sym = allocate_Sexp(heap);
         switch (parse_res->kind) {
             case Success:
-                readSymbolAndTail(cs, parse_res->position, len, parse_res, heap);
+                copy_Sexp(sym, parse_res->success_Sexp);
+                readThingAndTail(sym, cs, parse_res->position, len, parse_res, heap);
                 break;
             case ErrorAt:
                 break;
         }
     }
+    else if (cs[i] == '(') {
+        readTail(cs, i+1, len, parse_res, heap);
+    }
 }
 
-void readSymbolAndTail(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap) {
-    Sexp* sym = allocate_Sexp(heap);
-    copy_Sexp(sym, parse_res->success_Sexp);
+void readThingAndTail(Sexp* thing, char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap) {
     Sexp* list;
     readTail(cs, i, len, parse_res, heap);
     switch (parse_res->kind) {
@@ -227,7 +230,7 @@ void readSymbolAndTail(char* cs, size_t i, size_t len, ParseResult* parse_res, S
             copy_Sexp(list, parse_res->success_Sexp);
             construct_PR_success(
                 parse_res, parse_res->position,
-                construct_cons(parse_res->success_Sexp, sym, list)
+                construct_cons(parse_res->success_Sexp, thing, list)
             );
             break;
         case ErrorAt:
