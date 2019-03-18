@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_SYMBOL_LENGTH 10
+#define MAX_SYMBOL_LENGTH 30
 #define MAX_DISPLAY_SEXP 200
 
 #define HEAP_SIZE 100
@@ -48,21 +48,22 @@ struct ParseResult {
 Sexp* construct_nil(Sexp* s);
 Sexp* construct_symbol(Sexp* s, char name[MAX_SYMBOL_LENGTH]);
 Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2);
+Sexp* copy_Sexp(Sexp* dest, Sexp* src);
+
+void showSexp (Sexp* s, char* result);
+void showTail (Sexp* s, char* result);
+
+void clear_heap(SexpHeap*);
+Sexp* allocate_Sexp(SexpHeap* heap);
 
 ParseResult* construct_PR_success(ParseResult* p, unsigned int position, Sexp* s);
 ParseResult* construct_PR_error(ParseResult* p, unsigned int position);
 ParseResult* construct_PR_empty(ParseResult* p, Sexp* s);
 
-void showSexp (Sexp* s, char* result);
-void showTail (Sexp* s, char* result);
-
-void initialize_heap(SexpHeap*);
-void clear_heap(SexpHeap*);
-Sexp* allocate_Sexp(SexpHeap* heap);
-
 void readSexp (char* cs, ParseResult* parse_res, SexpHeap* heap);
 void readExp (char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
-void readSymbol (char* name, char* cs, size_t i, size_t len, ParseResult* parse_res);
-void readTail (char* cs, size_t i, size_t len, ParseResult* parse_res);
+void readSymbol (char* cs, size_t i, size_t len, ParseResult* parse_res);
+void readTail (char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
+void readSymbolAndTail(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
 void readClose (char* cs, size_t i, size_t len, ParseResult* parse_res);
 #endif

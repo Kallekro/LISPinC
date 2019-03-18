@@ -21,6 +21,19 @@ Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2) {
     return s;
 }
 
+Sexp* copy_Sexp(Sexp* dest, Sexp* src) {
+    dest->kind = src->kind;
+    dest->allocated = src->allocated;
+    switch (src->kind) {
+        case Symbol:
+            strcpy(dest->u.symbol.name, src->u.symbol.name);
+            break;
+        case Cons:
+            dest->u.cons.Sexp1 = src->u.cons.Sexp1;
+            dest->u.cons.Sexp2 = src->u.cons.Sexp2;
+            break;
+    }
+}
 
 void showSexp (Sexp* s, char* result) {
     switch (s->kind) {
@@ -64,12 +77,6 @@ void showTail (Sexp* s, char* result) {
     }
 }
 
-void initialize_heap(SexpHeap* heap) {
-    for (int i=0; i < HEAP_SIZE; i++) {
-        heap->nodes[i].allocated = 0;
-    }
-}
-
 void clear_heap(SexpHeap* heap) {
     for (int i=0; i < HEAP_SIZE; i++) {
         heap->nodes[i].allocated = 0;
@@ -82,6 +89,7 @@ Sexp* allocate_Sexp(SexpHeap* heap) {
             return &heap->nodes[i];
         }
     }
+    printf("Trigger garbage collection\n");
     return 0;
 }
 
@@ -114,6 +122,7 @@ void readSexp (char* cs, ParseResult* parse_res, SexpHeap* heap) {
     switch (tmp_parse_res.kind) {
         case Success:
             j = tmp_parse_res.position;
+            // skip whitespace
             while (j < len && (cs[j] == ' ' || cs[j] == '\n')) {
                 j++;
             }
@@ -127,5 +136,101 @@ void readSexp (char* cs, ParseResult* parse_res, SexpHeap* heap) {
 }
 
 void readExp(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap) {
-    construct_PR_success(parse_res, i, construct_symbol(parse_res->success_Sexp, "ABC"));
+    while (i < len && (cs[i] == ' ' || cs[i] == '\n')) {
+        i++;
+    }
+    if (i == len) {
+        construct_PR_error(parse_res, i);
+        return;
+    }
+    if ('a' <= cs[i] && 'z' >= cs[i]) {
+        readSymbol(cs, i, len, parse_res);
+    }
+    else if (cs[i] == '(') {
+        readTail(cs, i+1, len, parse_res, heap);
+    }
+    else if (cs[i] == '\'') {
+        readExp(cs, i+1, len, parse_res, heap);
+        Sexp* s0; Sexp* s1; Sexp* s2; Sexp* s3;
+        switch (parse_res->kind) {
+            case Success:
+                s0 = allocate_Sexp(heap);
+                copy_Sexp(s0, parse_res->success_Sexp);
+                s1 = allocate_Sexp(heap);
+                s2 = allocate_Sexp(heap);
+                s3 = allocate_Sexp(heap);
+                construct_PR_success(
+                    parse_res, parse_res->position,
+                    construct_cons(
+                        parse_res->success_Sexp,
+                        construct_symbol(s1, "quote"),
+                        construct_cons(s2, s0, construct_nil(s3)))
+                );
+                break;
+            case ErrorAt:
+                break;
+        }
+    }
+    else {
+        construct_PR_error(parse_res, i);
+    }
+}
+
+void readSymbol(char* cs, size_t i, size_t len, ParseResult* parse_res) {
+    char name[MAX_SYMBOL_LENGTH];
+    size_t name_idx = 0;
+    name[name_idx] = cs[i];
+    for (++i; i < len; i++) {
+        if ('a' <= cs[i] && 'z' >= cs[i]) {
+            name[++name_idx] = cs[i];
+        } else {
+            break;
+        }
+    }
+    construct_PR_success(
+        parse_res, i,
+        construct_symbol(parse_res->success_Sexp, name)
+    );
+}
+
+void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap) {
+    if (i == len) {
+        construct_PR_error(parse_res, i);
+        return;
+    }
+    if (cs[i] == ')') {
+        construct_PR_success(
+            parse_res, i,
+            construct_nil(parse_res->success_Sexp)
+        );
+    }
+    else if ('a' <= cs[i] && 'z' >= cs[i]) {
+        readSymbol(cs, i, len, parse_res);
+        switch (parse_res->kind) {
+            case Success:
+                readSymbolAndTail(cs, parse_res->position, len, parse_res, heap);
+                break;
+            case ErrorAt:
+                break;
+        }
+    }
+}
+
+void readSymbolAndTail(char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap) {
+    Sexp* sym = allocate_Sexp(heap);
+    copy_Sexp(sym, parse_res->success_Sexp);
+    Sexp* list;
+    readTail(cs, i, len, parse_res, heap);
+    switch (parse_res->kind) {
+        case Success:
+            list = allocate_Sexp(heap);
+            copy_Sexp(list, parse_res->success_Sexp);
+            construct_PR_success(
+                parse_res, parse_res->position,
+                construct_cons(parse_res->success_Sexp, sym, list)
+            );
+            break;
+        case ErrorAt:
+            break;
+    }
 }

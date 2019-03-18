@@ -2,14 +2,14 @@
 
 int main() {
     SexpHeap heap;
-    initialize_heap(&heap);
+    clear_heap(&heap);
     ParseResult parse_res;
     Sexp* parse_s_exp = allocate_Sexp(&heap);
     construct_PR_empty(&parse_res, parse_s_exp);
 
     char buffer[200];
     buffer[0] = '\0';
-    readSexp("lol", &parse_res, &heap);
+    readSexp("abc", &parse_res, &heap);
     showSexp(parse_res.success_Sexp, buffer);
     printf("%s\n", buffer);
     //printf("%d\n", parse_res.position);
