@@ -28,6 +28,13 @@ int lookup(Binding env[], char x[], Sexp** out_val) {
     return 1;
 }
 
+int lookup_and_global(Binding env[], char x[], Sexp** out_val) {
+    if (lookup(globalEnv, x, out_val) == 0) {
+        return 0;
+    }
+    return lookup(env, x, out_val);
+}
+
 void update(Binding env[], char x[], Sexp* new_val) {
     int free_idx = -1;
     for (int i=0; i < ENV_SIZE; i++) {
@@ -49,14 +56,83 @@ void update(Binding env[], char x[], Sexp* new_val) {
 }
 
 #define KEYWORDS_C 6
-char keywords[MAX_SYMBOL_LENGTH][KEYWORDS_C] = {
+char keywords[KEYWORDS_C][MAX_SYMBOL_LENGTH] = {
     "quote", "lambda", "define", "cons", "save", "load"
 };
+int iskeyword(char x[]) {
+    for (int i=0; i < KEYWORDS_C; i++) {
+        if (strcmp(keywords[i], x) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
-int evaluate(Sexp* s, char err_msg[]) {
-    Binding localEnv[ENV_SIZE];
-    init_env(localEnv);
+int evaluate(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]);
 
+int evaluate_cons(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
+    Sexp* s1 = s->u.cons.Sexp1; Sexp* s2 = s->u.cons.Sexp2;
+    char* charbuf;
+    switch (s1->kind) {
+        case Symbol:
+            if (strcmp(s1->u.symbol.name, "quote") == 0
+            && s2->kind == Cons
+            && s2->u.cons.Sexp2->kind == Nil) {
+                copy_Sexp(out_s, s2->u.cons.Sexp1);
+            }
+            else if (strcmp(s1->u.symbol.name, "lambda") == 0) {
+                copy_Sexp(out_s, s);
+            }
+            else if (strcmp(s1->u.symbol.name, "define") == 0
+            && s2->kind == Cons
+            && s2->u.cons.Sexp1->kind == Symbol
+            && s2->u.cons.Sexp2->kind == Cons
+            && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
+                charbuf = s2->u.cons.Sexp1->u.symbol.name;
+                if (iskeyword(charbuf)) {
+                    sprintf(err_msg,
+                        "keyword %s can not be redefined", charbuf);
+                    return 1;
+                }
+                if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1,
+                             s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                    return 1;
+                }
+                update(globalEnv, charbuf, s2->u.cons.Sexp2->u.cons.Sexp1);
+                construct_nil(s);
+            }
+            else if (strcmp(s1->u.symbol.name, "cons") == 0) {
+                // Todo
+            }
+            break;
+        default:
+            // function application?
+            break;
+    }
+    return 0;
+}
+
+int evaluate(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
+    switch (s->kind) {
+        case Symbol:
+            if (iskeyword(s->u.symbol.name)) {
+                sprintf(err_msg,
+                    "keyword %s can not be used as variable", s->u.symbol.name);
+                return 1;
+            } else {
+                if (lookup_and_global(localEnv, s->u.symbol.name, &out_s) != 0) {
+                    sprintf(err_msg,
+                        "undefined variable %s", s->u.symbol.name);
+                    return 1;
+                }
+            }
+            break;
+        case Cons:
+            return evaluate_cons(s, out_s, localEnv, err_msg);
+            break;
+        case Nil:
+            break;
+    }
     return 0;
 }
 
@@ -80,12 +156,17 @@ void repl(ParseResult* parse_res) {
         switch (parse_res->kind) {
             case Success:
                 if (parse_res->position == 0) {
-                    printf("= ");
                     char error_msg[100];
-                    int ec = evaluate(parse_res->success_Sexp, error_msg);
+                    Binding localEnv[ENV_SIZE];
+                    init_env(localEnv);
+                    Sexp out_s;
+                    out_s.allocated = 1;
+                    construct_nil(&out_s);
+                    int ec = evaluate(parse_res->success_Sexp, &out_s, localEnv, error_msg);
                     switch (ec) {
                         case 0:
-                            print_Sexp(parse_res->success_Sexp);
+                            printf("= ");
+                            print_Sexp(&out_s);
                             break;
                         default:
                             printf("! %s\n", error_msg);
