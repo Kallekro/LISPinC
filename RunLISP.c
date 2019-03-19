@@ -1,3 +1,5 @@
+// FIX:
+// define binds with (name, name) instead of (name, val)
 #include "Sexp.h"
 
 #define ENV_SIZE 100
@@ -73,49 +75,51 @@ int evaluate(Sexp* s, Binding localEnv[], char err_msg[]);
 int evaluate_cons(Sexp* s, Binding localEnv[], char err_msg[]) {
     Sexp* s1 = s->u.cons.Sexp1; Sexp* s2 = s->u.cons.Sexp2;
     char* charbuf;
-    switch (s1->kind) {
-        case Symbol:
-            if (strcmp(s1->u.symbol.name, "quote") == 0
-            && s2->kind == Cons
-            && s2->u.cons.Sexp2->kind == Nil) {
-                copy_Sexp(s, s2->u.cons.Sexp1);
+    if (s1->kind == Symbol) {
+        if (strcmp(s1->u.symbol.name, "quote") == 0
+        && s2->kind == Cons
+        && s2->u.cons.Sexp2->kind == Nil) {
+            copy_Sexp(s, s2->u.cons.Sexp1);
+        }
+        else if (strcmp(s1->u.symbol.name, "lambda") == 0) {
+            copy_Sexp(s, s);
+        }
+        else if (strcmp(s1->u.symbol.name, "define") == 0
+        && s2->kind == Cons
+        && s2->u.cons.Sexp1->kind == Symbol
+        && s2->u.cons.Sexp2->kind == Cons
+        && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
+            charbuf = s2->u.cons.Sexp1->u.symbol.name;
+            if (iskeyword(charbuf)) {
+                sprintf(err_msg,
+                    "keyword %s can not be redefined", charbuf);
+                return 1;
             }
-            else if (strcmp(s1->u.symbol.name, "lambda") == 0) {
-                copy_Sexp(s, s);
+            if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                return 1;
             }
-            else if (strcmp(s1->u.symbol.name, "define") == 0
-            && s2->kind == Cons
-            && s2->u.cons.Sexp1->kind == Symbol
-            && s2->u.cons.Sexp2->kind == Cons
-            && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
-                charbuf = s2->u.cons.Sexp1->u.symbol.name;
-                if (iskeyword(charbuf)) {
-                    sprintf(err_msg,
-                        "keyword %s can not be redefined", charbuf);
-                    return 1;
-                }
-                if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
-                    return 1;
-                }
-                update(globalEnv, charbuf, s2->u.cons.Sexp2->u.cons.Sexp1);
-                construct_nil(s);
+            update(globalEnv, charbuf, s2->u.cons.Sexp2->u.cons.Sexp1);
+            construct_nil(s);
+        }
+        else if (strcmp(s1->u.symbol.name, "cons") == 0
+        && s2->kind == Cons
+        && s2->u.cons.Sexp2->kind == Cons
+        && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
+            if (evaluate(s2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                return 1;
             }
-            else if (strcmp(s1->u.symbol.name, "cons") == 0
-            && s2->kind == Cons
-            && s2->u.cons.Sexp2->kind == Cons
-            && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
-                if (evaluate(s2->u.cons.Sexp1, localEnv, err_msg) != 0) {
-                    return 1;
-                }
-                if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
-                    return 1;
-                }
-                construct_cons(s, s2->u.cons.Sexp1, s2->u.cons.Sexp2->u.cons.Sexp1);
+            if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                return 1;
             }
-            break;
-        default:
-            // function application
-            break;
+            construct_cons(s, s2->u.cons.Sexp1, s2->u.cons.Sexp2->u.cons.Sexp1);
+        }
+        else if (strcmp(s1->u.symbol.name, "save") == 0) {
+
+        }
+        else if (strcmp(s1->u.symbol.name, "load") == 0) {
+
+        }
+        return 0;
     }
     return 0;
 }
