@@ -114,7 +114,7 @@ int evaluate_cons(Sexp* s, Binding localEnv[], char err_msg[]) {
             }
             break;
         default:
-            // function application?
+            // function application
             break;
     }
     return 0;
