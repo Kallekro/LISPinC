@@ -54,7 +54,7 @@ void showSexp (Sexp* s, char* result) {
             && s->u.cons.Sexp2->u.cons.Sexp2->kind == Nil)
             {
                 strcat(result, "\'");
-                showSexp(s->u.cons.Sexp2, result);
+                showSexp(s->u.cons.Sexp2->u.cons.Sexp1, result);
             } else {
                 strcat(result, "(");
                 showSexp(s->u.cons.Sexp1, result);
@@ -138,6 +138,8 @@ void readSexp (char* cs, ParseResult* parse_res) {
         case ErrorAt:
             construct_PR_error(parse_res, parse_res->position);
             break;
+        case Empty:
+            break;
     }
 }
 
@@ -172,6 +174,7 @@ void readExp(char* cs, size_t i, size_t len, ParseResult* parse_res) {
                 );
                 break;
             case ErrorAt:
+                construct_PR_error(parse_res, parse_res->position);
                 break;
         }
     }
@@ -222,6 +225,7 @@ void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res) {
                 readSexpAndTail(s0, cs, parse_res->position, len, parse_res);
                 break;
             case ErrorAt:
+                construct_PR_error(parse_res, parse_res->position);
                 break;
         }
     }
@@ -234,6 +238,7 @@ void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res) {
                 readSexpAndTail(s0, cs, parse_res->position, len, parse_res);
                 break;
             case ErrorAt:
+                construct_PR_error(parse_res, parse_res->position);
                 break;
         }
     }
@@ -246,6 +251,7 @@ void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res) {
                 readQuoteSexpAndTail(s0, cs, parse_res->position, len, parse_res);
                 break;
             case ErrorAt:
+                construct_PR_error(parse_res, parse_res->position);
                 break;
         }
     }
@@ -262,10 +268,12 @@ void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res) {
                         construct_PR_success(parse_res, parse_res->position, s0);
                         break;
                     case ErrorAt:
+                        construct_PR_error(parse_res, parse_res->position);
                         break;
                 }
                 break;
             case ErrorAt:
+                construct_PR_error(parse_res, parse_res->position);
                 break;
         }
     }
@@ -284,6 +292,7 @@ void readSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse
             );
             break;
         case ErrorAt:
+            construct_PR_error(parse_res, parse_res->position);
             break;
     }
 }
@@ -312,6 +321,7 @@ void readQuoteSexpAndTail(Sexp* quote_s, char* cs, size_t i, size_t len, ParseRe
             );
             break;
         case ErrorAt:
+            construct_PR_error(parse_res, parse_res->position);
             break;
     }
 }
