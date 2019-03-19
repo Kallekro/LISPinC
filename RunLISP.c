@@ -68,9 +68,9 @@ int iskeyword(char x[]) {
     return 0;
 }
 
-int evaluate(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]);
+int evaluate(Sexp* s, Binding localEnv[], char err_msg[]);
 
-int evaluate_cons(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
+int evaluate_cons(Sexp* s, Binding localEnv[], char err_msg[]) {
     Sexp* s1 = s->u.cons.Sexp1; Sexp* s2 = s->u.cons.Sexp2;
     char* charbuf;
     switch (s1->kind) {
@@ -78,10 +78,10 @@ int evaluate_cons(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
             if (strcmp(s1->u.symbol.name, "quote") == 0
             && s2->kind == Cons
             && s2->u.cons.Sexp2->kind == Nil) {
-                copy_Sexp(out_s, s2->u.cons.Sexp1);
+                copy_Sexp(s, s2->u.cons.Sexp1);
             }
             else if (strcmp(s1->u.symbol.name, "lambda") == 0) {
-                copy_Sexp(out_s, s);
+                copy_Sexp(s, s);
             }
             else if (strcmp(s1->u.symbol.name, "define") == 0
             && s2->kind == Cons
@@ -94,15 +94,23 @@ int evaluate_cons(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
                         "keyword %s can not be redefined", charbuf);
                     return 1;
                 }
-                if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1,
-                             s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
                     return 1;
                 }
                 update(globalEnv, charbuf, s2->u.cons.Sexp2->u.cons.Sexp1);
                 construct_nil(s);
             }
-            else if (strcmp(s1->u.symbol.name, "cons") == 0) {
-                // Todo
+            else if (strcmp(s1->u.symbol.name, "cons") == 0
+            && s2->kind == Cons
+            && s2->u.cons.Sexp2->kind == Cons
+            && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
+                if (evaluate(s2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                    return 1;
+                }
+                if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, localEnv, err_msg) != 0) {
+                    return 1;
+                }
+                construct_cons(s, s2->u.cons.Sexp1, s2->u.cons.Sexp2->u.cons.Sexp1);
             }
             break;
         default:
@@ -112,7 +120,7 @@ int evaluate_cons(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
     return 0;
 }
 
-int evaluate(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
+int evaluate(Sexp* s, Binding localEnv[], char err_msg[]) {
     switch (s->kind) {
         case Symbol:
             if (iskeyword(s->u.symbol.name)) {
@@ -120,7 +128,7 @@ int evaluate(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
                     "keyword %s can not be used as variable", s->u.symbol.name);
                 return 1;
             } else {
-                if (lookup_and_global(localEnv, s->u.symbol.name, &out_s) != 0) {
+                if (lookup_and_global(localEnv, s->u.symbol.name, &s) != 0) {
                     sprintf(err_msg,
                         "undefined variable %s", s->u.symbol.name);
                     return 1;
@@ -128,7 +136,7 @@ int evaluate(Sexp* s, Sexp* out_s, Binding localEnv[], char err_msg[]) {
             }
             break;
         case Cons:
-            return evaluate_cons(s, out_s, localEnv, err_msg);
+            return evaluate_cons(s, localEnv, err_msg);
             break;
         case Nil:
             break;
@@ -159,14 +167,11 @@ void repl(ParseResult* parse_res) {
                     char error_msg[100];
                     Binding localEnv[ENV_SIZE];
                     init_env(localEnv);
-                    Sexp out_s;
-                    out_s.allocated = 1;
-                    construct_nil(&out_s);
-                    int ec = evaluate(parse_res->success_Sexp, &out_s, localEnv, error_msg);
+                    int ec = evaluate(parse_res->success_Sexp, localEnv, error_msg);
                     switch (ec) {
                         case 0:
                             printf("= ");
-                            print_Sexp(&out_s);
+                            print_Sexp(parse_res->success_Sexp);
                             break;
                         default:
                             printf("! %s\n", error_msg);
@@ -196,6 +201,7 @@ int main() {
     Sexp* parse_s_exp = allocate_Sexp();
     construct_PR_empty(&parse_res, parse_s_exp);
 
+    printf("PLD LISP v. 1.0 - Ported to C\n");
     repl(&parse_res);
 /*
     Sexp* s0 = allocate_Sexp();
@@ -220,6 +226,7 @@ int main() {
     printf("\n");
     for (int i=0; i < 40; i++) { printf("-"); }
     printf("\nS-expression size: %ld bytes\n", sizeof(Sexp));
+    printf("Total heap size: %ld bytes\n", sizeof(Heap));
     printf("\nTotal bytes allocated: %u\n", total_bytes_allocated);
     printf("Total bytes freed: %u\n", total_bytes_freed);
     printf("Total garbage collections: %u\n", total_garbage_collections);
