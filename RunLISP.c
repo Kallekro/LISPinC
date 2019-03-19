@@ -1,30 +1,24 @@
 #include "Sexp.h"
 
 int main() {
-    SexpHeap heap;
-    clear_heap(&heap);
+    total_bytes_allocated = 0;
+    total_garbage_collections = 0;
+    clear_heap();
     ParseResult parse_res;
-    Sexp* parse_s_exp = allocate_Sexp(&heap);
+    Sexp* parse_s_exp = allocate_Sexp();
     construct_PR_empty(&parse_res, parse_s_exp);
 
-    char buffer[200];
-    buffer[0] = '\0';
-    readSexp("abc", &parse_res, &heap);
-    showSexp(parse_res.success_Sexp, buffer);
-    printf("%s\n", buffer);
-    //printf("%d\n", parse_res.position);
+    readSexp("(define caar (lambda (((aa . da) . d)) aa))", &parse_res);
+    print_Sexp(parse_res.success_Sexp);
 
-    //construct_symbol(&sexps[1], "abe\0");
-    //construct_cons(&sexps[4], &sexps[1], construct_nil(&sexps[3]));
-    //construct_symbol(&sexps[0], "quote\0");
-    //construct_cons(&sexps[2], &sexps[0], &sexps[4]);
-//
-    //char buffer[200];
-    //buffer[0] = '\0';
-//
-    //showSexp(&sexps[2], buffer);
-    //printf("%s", buffer);
-    //printf("lo: %s%s", sexps[2].u.cons.Sexp1->u.symbol.name, sexps[2].u.cons.Sexp2->u.symbol.name);
+
+
+    // Print footer
+    printf("\n");
+    for (int i=0; i < 40; i++) { printf("-"); }
+    printf("\nS-expression size: %ld bytes\n", sizeof(Sexp));
+    printf("\nTotal bytes allocated: %u\n", total_bytes_allocated);
+    printf("Total bytes freed: %u\n", total_bytes_freed);
+    printf("Total garbage collections: %u\n", total_garbage_collections);
     return 0;
-
 }

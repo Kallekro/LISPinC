@@ -28,10 +28,13 @@ struct Sexp {
     } u;
 };
 
-typedef struct SexpHeap SexpHeap;
-struct SexpHeap {
-    Sexp nodes[HEAP_SIZE];
-};
+Sexp* construct_nil(Sexp* s);
+Sexp* construct_symbol(Sexp* s, char name[MAX_SYMBOL_LENGTH]);
+Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2);
+Sexp* copy_Sexp(Sexp* dest, Sexp* src);
+
+void showSexp (Sexp* s, char* result);
+void showTail (Sexp* s, char* result);
 
 enum ParseResult_kind {
     Success, ErrorAt, Empty
@@ -45,25 +48,29 @@ struct ParseResult {
     Sexp* success_Sexp;
 };
 
-Sexp* construct_nil(Sexp* s);
-Sexp* construct_symbol(Sexp* s, char name[MAX_SYMBOL_LENGTH]);
-Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2);
-Sexp* copy_Sexp(Sexp* dest, Sexp* src);
-
-void showSexp (Sexp* s, char* result);
-void showTail (Sexp* s, char* result);
-
-void clear_heap(SexpHeap*);
-Sexp* allocate_Sexp(SexpHeap* heap);
-
 ParseResult* construct_PR_success(ParseResult* p, unsigned int position, Sexp* s);
 ParseResult* construct_PR_error(ParseResult* p, unsigned int position);
 ParseResult* construct_PR_empty(ParseResult* p, Sexp* s);
 
-void readSexp (char* cs, ParseResult* parse_res, SexpHeap* heap);
-void readExp (char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
+//ParseResult parseResult;
+//Sexp parse_res_s;
+
+Sexp Heap[HEAP_SIZE];
+unsigned int total_bytes_allocated;
+unsigned int total_bytes_freed;
+unsigned int total_garbage_collections;
+void clear_heap();
+Sexp* allocate_Sexp();
+
+
+void readSexp (char* cs, ParseResult* parse_res);
+void readExp (char* cs, size_t i, size_t len, ParseResult* parse_res);
 void readSymbol (char* cs, size_t i, size_t len, ParseResult* parse_res);
-void readTail (char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
-void readThingAndTail(Sexp* thing, char* cs, size_t i, size_t len, ParseResult* parse_res, SexpHeap* heap);
+void readTail (char* cs, size_t i, size_t len, ParseResult* parse_res);
+void readSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse_res);
+void readQuoteSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse_res);
 void readClose (char* cs, size_t i, size_t len, ParseResult* parse_res);
+
+// Debugging
+void print_Sexp(Sexp* s);
 #endif
