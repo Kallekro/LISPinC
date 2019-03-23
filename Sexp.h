@@ -6,7 +6,7 @@
 #define MAX_SYMBOL_LENGTH 30
 #define MAX_DISPLAY_SEXP 200
 
-#define HEAP_SIZE 100
+#define HEAP_SIZE 1000
 
 enum Sexp_kind {
     Symbol, Nil, Cons

@@ -338,7 +338,6 @@ void readClose(char* cs, size_t i, size_t len, ParseResult* parse_res) {
     construct_PR_success(parse_res, i+1, s0);
 }
 
-// Debugging
 void print_Sexp(Sexp* s) {
     char buffer[200];
     buffer[0] = '\0';
