@@ -1,18 +1,10 @@
 // TODO:
 //      * Reduce amount of allocations of s_out
 //      * non error-code int -> size_t ?
-#include "Sexp.h"
-
-#define ENV_SIZE 100
-
-typedef struct Binding Binding;
-struct Binding {
-    int valid;
-    char name[MAX_SYMBOL_LENGTH];
-    Sexp* value;
+#include "RunLISP.h"
+const char keywords[KEYWORDS_C][MAX_SYMBOL_LENGTH] = {
+    "quote", "lambda", "define", "cons", "save", "load"
 };
-
-Binding globalEnv[ENV_SIZE];
 
 void init_env(Binding env[]) {
     for (int i=0; i < ENV_SIZE; i++) {
@@ -74,10 +66,6 @@ int appendEnv(Binding env1[], Binding env2[], char err_msg[]) {
     return 0;
 }
 
-#define KEYWORDS_C 6
-char keywords[KEYWORDS_C][MAX_SYMBOL_LENGTH] = {
-    "quote", "lambda", "define", "cons", "save", "load"
-};
 int iskeyword(char x[]) {
     for (int i=0; i < KEYWORDS_C; i++) {
         if (strcmp(keywords[i], x) == 0) {
@@ -86,8 +74,6 @@ int iskeyword(char x[]) {
     }
     return 0;
 }
-
-int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]);
 
 int evaluate(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) {
     switch (s_in->kind) {
@@ -108,6 +94,8 @@ int evaluate(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) {
             return evaluate_cons(s_in, s_out, localEnv, err_msg);
             break;
         case Nil:
+            *s_out = allocate_Sexp();
+            construct_nil(*s_out);
             break;
     }
     return 0;
@@ -173,9 +161,9 @@ int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) 
     && e1->u.cons.Sexp1->kind == Symbol
     && strcmp(e1->u.cons.Sexp1->u.symbol.name, "lambda") == 0) {
         Sexp* args = allocate_Sexp();
-        if (evalList(s2, args, localEnv, err_msg) != 0) { return 1; }
+        if (evalList(s2, &args, localEnv, err_msg) != 0) { return 1; }
         *s_out = allocate_Sexp();
-        if (tryRules(e1->u.cons.Sexp2, &s_out, args, localEnv, err_msg) != 0) { return 1; }
+        if (tryRules(e1->u.cons.Sexp2, s_out, args, localEnv, err_msg) != 0) { return 1; }
         return 0;
     }
     sprintf(err_msg, "no matches");
@@ -203,7 +191,6 @@ int evalList(Sexp* es, Sexp** s_out, Binding localEnv[], char err_msg[]) {
     }
     return 0;
 }
-
 
 int tryRules(Sexp* rs, Sexp** s_out, Sexp* args, Binding localEnv[], char err_msg[]) {
     char msgbuf[200];
@@ -279,8 +266,9 @@ int matchPattern(Sexp* p, Sexp* v, Binding env[], char err_msg[]) {
     return 0;
 }
 
-
-int quoteExp();
+int quoteExp() {
+    // TODO
+}
 
 void repl(ParseResult* parse_res) {
     char input_buffer[200];
@@ -329,45 +317,4 @@ void repl(ParseResult* parse_res) {
                 break;
         }
     }
-}
-
-int main() {
-    init_env(globalEnv);
-    total_bytes_allocated = 0;
-    total_garbage_collections = 0;
-    clear_heap();
-    ParseResult parse_res;
-    Sexp* parse_s_exp = allocate_Sexp();
-    construct_PR_empty(&parse_res, parse_s_exp);
-
-    printf("PLD LISP v. 1.0 - Ported to C\n");
-    repl(&parse_res);
-/*
-    Sexp* s0 = allocate_Sexp();
-    construct_symbol(s0, "abc");
-    Sexp* s1 = allocate_Sexp();
-    construct_symbol(s1, "cba");
-    update(globalEnv, "x", s0);
-    Sexp* out;
-    if (lookup(globalEnv, "x", &out) == 0) {
-        print_Sexp(out);
-    } else {
-        printf("not found\n");
-    }
-    update(globalEnv, "x", s1);
-    if (lookup(globalEnv, "x", &out) == 0) {
-        print_Sexp(out);
-    } else {
-        printf("not found\n");
-    }
-*/
-    // Print footer
-    printf("\n");
-    for (int i=0; i < 40; i++) { printf("-"); }
-    printf("\nS-expression size: %ld bytes\n", sizeof(Sexp));
-    printf("Total heap size: %ld bytes\n", sizeof(Heap));
-    printf("\nTotal bytes allocated: %u\n", total_bytes_allocated);
-    printf("Total bytes freed: %u\n", total_bytes_freed);
-    printf("Total garbage collections: %u\n", total_garbage_collections);
-    return 0;
 }
