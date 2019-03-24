@@ -25,8 +25,8 @@ int evalList(Sexp* es, Sexp** s_out, Binding localEnv[], char err_msg[]);
 int tryRules(Sexp* rs, Sexp** s_out, Sexp* args, Binding localEnv[], char err_msg[]);
 int disjoint(Binding env1[], Binding env2[], char err_msg[]);
 int matchPattern(Sexp* p, Sexp* v, Binding env[], char err_msg[]);
-void saveGlobalEnvironment();
+int saveGlobalEnvironment(char* fname, char err_msg[]);
 int loadGlobalEnvironment(char* fname, char err_msg[]);
-int quoteExp();
+void quoteExp(Sexp* v, char output[]);
 void repl(ParseResult* parse_res);
 #endif

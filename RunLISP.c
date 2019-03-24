@@ -167,9 +167,12 @@ int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) 
             construct_cons(*s_out, e1, e2);
             return 0;
         }
-        else if (strcmp(s1->u.symbol.name, "save") == 0) {
+        else if (strcmp(s1->u.symbol.name, "save") == 0
+        && s2->kind == Cons
+        && s2->u.cons.Sexp1->kind == Symbol
+        && s2->u.cons.Sexp2->kind == Nil) {
             // lower carbon emissions
-            saveGlobalEnvironment();
+            if (saveGlobalEnvironment(s2->u.cons.Sexp1->u.symbol.name, err_msg) != 0) { return 1; }
             return 0;
         }
         else if (strcmp(s1->u.symbol.name, "load") == 0
@@ -294,8 +297,23 @@ int matchPattern(Sexp* p, Sexp* v, Binding env[], char err_msg[]) {
     return 0;
 }
 
-void saveGlobalEnvironment() {
-
+int saveGlobalEnvironment(char* fname, char err_msg[]) {
+    FILE* fp;
+    char path[MAX_FILE_NAME];
+    sprintf(path, "%s.le", fname);
+    fp = fopen(path, "w");
+    if (fp == 0) {
+        sprintf(err_msg, "could not open file %s", path);
+        return 1;
+    }
+    char valbuf[MAX_DISPLAY_SEXP];
+    for (int i=0; i < ENV_SIZE; i++) {
+        valbuf[0] = 0;
+        if (!globalEnv[i].valid) { break; }
+        quoteExp(globalEnv[i].value, valbuf);
+        fprintf(fp, "(define %s %s)\n", globalEnv[i].name, valbuf);
+    }
+    fclose(fp);
 }
 
 int loadGlobalEnvironment(char* fname, char err_msg[]) {
@@ -336,8 +354,20 @@ int loadGlobalEnvironment(char* fname, char err_msg[]) {
     return 0;
 }
 
-int quoteExp() {
-    // TODO
+void quoteExp(Sexp* v, char output[]) {
+    if (v->kind == Nil) {
+        sprintf(output, "()");
+    }
+    else if (v->kind == Cons
+    && v->u.cons.Sexp1->kind == Symbol
+    && (strcmp(v->u.cons.Sexp1->u.symbol.name, "quote") == 0
+    || strcmp(v->u.cons.Sexp1->u.symbol.name, "lambda") == 0)) {
+        showSexp(v, output);
+    } else {
+        char tmp_out[MAX_DISPLAY_SEXP];
+        showSexp(v, tmp_out);
+        sprintf(output, "(quote %s)", tmp_out);
+    }
 }
 
 void repl(ParseResult* parse_res) {
