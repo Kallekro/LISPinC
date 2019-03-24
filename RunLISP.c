@@ -1,7 +1,5 @@
-// TODO:
-//      * Reduce amount of allocations of s_out
-//      * non error-code int -> size_t ?
 #include "RunLISP.h"
+
 const char keywords[KEYWORDS_C][MAX_SYMBOL_LENGTH] = {
     "quote", "lambda", "define", "cons", "save", "load"
 };
@@ -66,6 +64,29 @@ int appendEnv(Binding env1[], Binding env2[], char err_msg[]) {
     return 0;
 }
 
+int get_root_set(Binding env1[], Binding env2[], RootSet* rootSet) {
+    int i;
+    for (i=0; i < ENV_SIZE; i++) {
+        if (!env1[i].valid) { break; }
+        rootSet->set[i] = env1[i].value;
+    }
+    if (env2 != 0) {
+        for (int j = 0; j < ENV_SIZE; j++) {
+            if (!env2[j].valid) { break; }
+            rootSet->set[i++] = env1[j].value;
+        }
+    }
+    rootSet->length = i;
+    rootSet->set[i] = 0;
+}
+
+Sexp* safe_allocate(Binding localEnv[]) {
+    RootSet tmp_root_set;
+    construct_rootSet(&tmp_root_set);
+    get_root_set(globalEnv, localEnv, &tmp_root_set);
+    return allocate_Sexp(&tmp_root_set);
+}
+
 int iskeyword(char x[]) {
     for (int i=0; i < KEYWORDS_C; i++) {
         if (strcmp(keywords[i], x) == 0) {
@@ -94,7 +115,7 @@ int evaluate(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) {
             return evaluate_cons(s_in, s_out, localEnv, err_msg);
             break;
         case Nil:
-            *s_out = allocate_Sexp();
+            *s_out = safe_allocate(localEnv);
             construct_nil(*s_out);
             break;
     }
@@ -112,7 +133,7 @@ int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) 
             return 0;
         }
         else if (strcmp(s1->u.symbol.name, "lambda") == 0) {
-            *s_out = allocate_Sexp();
+            *s_out = safe_allocate(localEnv);
             copy_Sexp(*s_out, s_in);
             return 0;
         }
@@ -126,11 +147,12 @@ int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) 
                 sprintf(err_msg, "keyword %s can not be redefined", charbuf);
                 return 1;
             }
-            if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, s_out, localEnv, err_msg) != 0) {
+            Sexp* e1 = safe_allocate(localEnv);
+            if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, &e1, localEnv, err_msg) != 0) {
                 return 1;
             }
-            update(globalEnv, charbuf, *s_out);
-            *s_out = allocate_Sexp();
+            update(globalEnv, charbuf, e1);
+            *s_out = safe_allocate(localEnv);
             construct_nil(*s_out);
             return 0;
         }
@@ -138,31 +160,37 @@ int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) 
         && s2->kind == Cons
         && s2->u.cons.Sexp2->kind == Cons
         && s2->u.cons.Sexp2->u.cons.Sexp2->kind == Nil) {
-            Sexp* e1 = allocate_Sexp(); Sexp* e2 = allocate_Sexp();
+            Sexp* e1 = safe_allocate(localEnv); Sexp* e2 = safe_allocate(localEnv);
             if (evaluate(s2->u.cons.Sexp1, &e1, localEnv, err_msg) != 0) { return 1; }
             if (evaluate(s2->u.cons.Sexp2->u.cons.Sexp1, &e2, localEnv, err_msg) != 0) { return 1; }
-            *s_out = allocate_Sexp();
+            *s_out = safe_allocate(localEnv);
             construct_cons(*s_out, e1, e2);
             return 0;
         }
         else if (strcmp(s1->u.symbol.name, "save") == 0) {
-
+            // lower carbon emissions
+            saveGlobalEnvironment();
             return 0;
         }
-        else if (strcmp(s1->u.symbol.name, "load") == 0) {
-
+        else if (strcmp(s1->u.symbol.name, "load") == 0
+        && s2->kind == Cons
+        && s2->u.cons.Sexp1->kind == Symbol
+        && s2->u.cons.Sexp2->kind == Nil) {
+            if (loadGlobalEnvironment(s2->u.cons.Sexp1->u.symbol.name, err_msg) != 0) { return 1; }
+            *s_out = safe_allocate(localEnv);
+            construct_nil(*s_out);
             return 0;
         }
     }
     // function application
-    Sexp* e1 = allocate_Sexp();
+    Sexp* e1 = safe_allocate(localEnv);
     if (evaluate(s1, &e1, localEnv, err_msg) != 0) { return 1; }
     if (e1->kind == Cons
     && e1->u.cons.Sexp1->kind == Symbol
     && strcmp(e1->u.cons.Sexp1->u.symbol.name, "lambda") == 0) {
-        Sexp* args = allocate_Sexp();
+        Sexp* args = safe_allocate(localEnv);
         if (evalList(s2, &args, localEnv, err_msg) != 0) { return 1; }
-        *s_out = allocate_Sexp();
+        *s_out = safe_allocate(localEnv);
         if (tryRules(e1->u.cons.Sexp2, s_out, args, localEnv, err_msg) != 0) { return 1; }
         return 0;
     }
@@ -174,14 +202,14 @@ int evalList(Sexp* es, Sexp** s_out, Binding localEnv[], char err_msg[]) {
     Sexp* e1; Sexp* e2; char msgbuf[200];
     switch (es->kind) {
         case Cons:
-            e1 = allocate_Sexp(); e2 = allocate_Sexp();
+            e1 = safe_allocate(localEnv); e2 = safe_allocate(localEnv);
             if (evaluate(es->u.cons.Sexp1, &e1, localEnv, err_msg) != 0) { return 1; }
             if (evalList(es->u.cons.Sexp2, &e2, localEnv, err_msg) != 0) { return 1; }
-            *s_out = allocate_Sexp();
+            *s_out = safe_allocate(localEnv);
             construct_cons(*s_out, e1, e2);
             break;
         case Nil:
-            *s_out = allocate_Sexp();
+            *s_out = safe_allocate(localEnv);
             construct_nil(*s_out);
             break;
         default:
@@ -206,7 +234,7 @@ int tryRules(Sexp* rs, Sexp** s_out, Sexp* args, Binding localEnv[], char err_ms
                 else if (ec == -1) {return 1; }
 
                 if (appendEnv(localEnv, outputEnv, err_msg) != 0) { return 1; }
-                *s_out = allocate_Sexp();
+                *s_out = safe_allocate(localEnv);
                 evaluate(rs->u.cons.Sexp2->u.cons.Sexp1, s_out, localEnv, err_msg);
                 return 0;
             }
@@ -266,6 +294,48 @@ int matchPattern(Sexp* p, Sexp* v, Binding env[], char err_msg[]) {
     return 0;
 }
 
+void saveGlobalEnvironment() {
+
+}
+
+int loadGlobalEnvironment(char* fname, char err_msg[]) {
+    FILE* fp;
+    char* line = 0;
+    size_t len = 0;
+    size_t read;
+    char path[MAX_FILE_NAME];
+    sprintf(path, "%s.le", fname);
+    fp = fopen(path, "r");
+    if (fp == 0) {
+        sprintf(err_msg, "could not open file %s", path);
+        return 1;
+    }
+    ParseResult parse_res;
+    Sexp parse_s_exp;
+    construct_PR_empty(&parse_res, &parse_s_exp);
+    RootSet rootSet;
+    construct_rootSet(&rootSet);
+    Sexp* out_s;
+    Binding localEnv[ENV_SIZE];
+    while ((read = getline(&line, &len, fp)) != -1) {
+        if (read == 0) { continue; }
+        get_root_set(globalEnv, 0, &rootSet);
+        readSexp(line, &parse_res, &rootSet);
+        switch (parse_res.kind) {
+            case Success:
+                init_env(localEnv);
+                if (evaluate(parse_res.success_Sexp, &out_s, localEnv, err_msg) != 0) { return 1; }
+                break;
+            case ErrorAt:
+                sprintf(err_msg, "error while reading %s", path);
+                return 1;
+        }
+    }
+    fclose(fp);
+    if (line) { free(line); }
+    return 0;
+}
+
 int quoteExp() {
     // TODO
 }
@@ -276,6 +346,9 @@ void repl(ParseResult* parse_res) {
     carry[0] = '\0';
     char str[400];
     Sexp* out_s;
+    //Sexp* root_set[ENV_SIZE*2];
+    RootSet rootSet;
+    construct_rootSet(&rootSet);
     while (1) {
         if (feof(stdin)) { break; }
         input_buffer[0] = '\0';
@@ -287,7 +360,8 @@ void repl(ParseResult* parse_res) {
         strcat(str, input_buffer);
         carry[0] = '\0';
         size_t len = strlen(str);
-        readSexp(str, parse_res);
+        get_root_set(globalEnv, 0, &rootSet);
+        readSexp(str, parse_res, &rootSet);
         switch (parse_res->kind) {
             case Success:
                 if (parse_res->position == 0) {
