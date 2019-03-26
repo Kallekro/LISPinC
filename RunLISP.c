@@ -239,8 +239,8 @@ int tryRules(Sexp* rs, Sexp** s_out, Sexp* args, Binding localEnv[], char err_ms
                 else if (ec == -1) {return 1; }
                 Binding tmp_env[ENV_SIZE];
                 init_env(tmp_env);
-                if (appendEnv(tmp_env, outputEnv, err_msg) != 0) { return 1; }
-                if (appendEnv(tmp_env, localEnv, err_msg) != 0) { return 1; }
+                if (appendEnv(tmp_env, outputEnv, err_msg) != 0) { return 1; } // order
+                if (appendEnv(tmp_env, localEnv,  err_msg) != 0) { return 1; } // matters
                 *s_out = safe_allocate(tmp_env);
                 evaluate(rs->u.cons.Sexp2->u.cons.Sexp1, s_out, tmp_env, err_msg);
                 return 0;
