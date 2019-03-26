@@ -28,5 +28,8 @@ int matchPattern(Sexp* p, Sexp* v, Binding env[], char err_msg[]);
 int saveGlobalEnvironment(char* fname, char err_msg[]);
 int loadGlobalEnvironment(char* fname, char err_msg[]);
 void quoteExp(Sexp* v, char output[]);
-void repl(ParseResult* parse_res);
+void repl();
+
+// debug
+void print_Env(Binding env[]);
 #endif

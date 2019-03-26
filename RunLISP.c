@@ -44,7 +44,8 @@ void update(Binding env[], char x[], Sexp* new_val) {
         strcpy(env[free_idx].name, x);
         env[free_idx].value = new_val;
     } else {
-        printf("stack overflow. Consider increasing environment size (ENV_SIZE).\n");
+        printf("Fatal error: stack overflow. Consider increasing environment size (ENV_SIZE).");
+        exit(1);
     }
 }
 
@@ -56,8 +57,8 @@ int appendEnv(Binding env1[], Binding env2[], char err_msg[]) {
     for (int i=0; i < ENV_SIZE; i++) {
         if (!env2[i].valid) { break; }
         if (free_idx >= ENV_SIZE) {
-            sprintf(err_msg, "stack overflow. Consider increasing environment size (ENV_SIZE).");
-            return 1;
+            printf("Fatal error: stack overflow. Consider increasing environment size (ENV_SIZE).");
+            exit(1);
         }
         env1[free_idx++] = env2[i];
     }
@@ -80,6 +81,7 @@ int get_root_set(Binding env1[], Binding env2[], RootSet* rootSet) {
     rootSet->set[i] = 0;
 }
 
+// don't let the name fool you
 Sexp* safe_allocate(Binding localEnv[]) {
     RootSet tmp_root_set;
     construct_rootSet(&tmp_root_set);
@@ -235,10 +237,12 @@ int tryRules(Sexp* rs, Sexp** s_out, Sexp* args, Binding localEnv[], char err_ms
                     return tryRules(rs->u.cons.Sexp2->u.cons.Sexp2, s_out, args, localEnv, err_msg);
                 }
                 else if (ec == -1) {return 1; }
-
-                if (appendEnv(localEnv, outputEnv, err_msg) != 0) { return 1; }
-                *s_out = safe_allocate(localEnv);
-                evaluate(rs->u.cons.Sexp2->u.cons.Sexp1, s_out, localEnv, err_msg);
+                Binding tmp_env[ENV_SIZE];
+                init_env(tmp_env);
+                if (appendEnv(tmp_env, outputEnv, err_msg) != 0) { return 1; }
+                if (appendEnv(tmp_env, localEnv, err_msg) != 0) { return 1; }
+                *s_out = safe_allocate(tmp_env);
+                evaluate(rs->u.cons.Sexp2->u.cons.Sexp1, s_out, tmp_env, err_msg);
                 return 0;
             }
             break;
@@ -250,19 +254,6 @@ int tryRules(Sexp* rs, Sexp** s_out, Sexp* args, Binding localEnv[], char err_ms
     showSexp(rs, msgbuf);
     sprintf(err_msg, "malformed rules: %s", msgbuf);
     return 1;
-}
-
-
-int disjoint(Binding env1[], Binding env2[], char err_msg[]) {
-    for (int i=0; i < ENV_SIZE; i++) {
-        if (!env1[i].valid) { break; }
-        Sexp* lookup_res;
-        if (lookup(env2, env1[i].name, &lookup_res) == 0) {
-            sprintf(err_msg, "repeated variable %s in pattern", env1[i].name);
-            return 1;
-        }
-    }
-    return 0;
 }
 
 // returns 0=false, 1=true, -1=error
@@ -291,6 +282,18 @@ int matchPattern(Sexp* p, Sexp* v, Binding env[], char err_msg[]) {
             if (appendEnv(env, env2, err_msg) != 0) {
                 return -1;
             }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int disjoint(Binding env1[], Binding env2[], char err_msg[]) {
+    for (int i=0; i < ENV_SIZE; i++) {
+        if (!env1[i].valid) { break; }
+        Sexp* lookup_res;
+        if (lookup(env2, env1[i].name, &lookup_res) == 0) {
+            sprintf(err_msg, "repeated variable %s in pattern", env1[i].name);
             return 1;
         }
     }
@@ -335,7 +338,9 @@ int loadGlobalEnvironment(char* fname, char err_msg[]) {
     construct_rootSet(&rootSet);
     Sexp* out_s;
     Binding localEnv[ENV_SIZE];
+    int linecount = -1;
     while ((read = getline(&line, &len, fp)) != -1) {
+        linecount++;
         if (read == 0) { continue; }
         get_root_set(globalEnv, 0, &rootSet);
         readSexp(line, &parse_res, &rootSet);
@@ -345,7 +350,9 @@ int loadGlobalEnvironment(char* fname, char err_msg[]) {
                 if (evaluate(parse_res.success_Sexp, &out_s, localEnv, err_msg) != 0) { return 1; }
                 break;
             case ErrorAt:
-                sprintf(err_msg, "error while reading %s", path);
+                sprintf(err_msg, "error while reading %s on line %d", path, linecount);
+                fclose(fp);
+                if (line) { free(line); }
                 return 1;
         }
     }
@@ -370,7 +377,14 @@ void quoteExp(Sexp* v, char output[]) {
     }
 }
 
-void repl(ParseResult* parse_res) {
+void repl() {
+    clear_heap();
+    init_env(globalEnv);
+    total_bytes_allocated = 0;
+    total_garbage_collections = 0;
+    ParseResult parse_res;
+    Sexp parse_s_exp;
+    construct_PR_empty(&parse_res, &parse_s_exp);
     char input_buffer[200];
     char carry[200];
     carry[0] = '\0';
@@ -391,14 +405,14 @@ void repl(ParseResult* parse_res) {
         carry[0] = '\0';
         size_t len = strlen(str);
         get_root_set(globalEnv, 0, &rootSet);
-        readSexp(str, parse_res, &rootSet);
-        switch (parse_res->kind) {
+        readSexp(str, &parse_res, &rootSet);
+        switch (parse_res.kind) {
             case Success:
-                if (parse_res->position == 0) {
+                if (parse_res.position == 0) {
                     char error_msg[100];
                     Binding localEnv[ENV_SIZE];
                     init_env(localEnv);
-                    int ec = evaluate(parse_res->success_Sexp, &out_s, localEnv, error_msg);
+                    int ec = evaluate(parse_res.success_Sexp, &out_s, localEnv, error_msg);
                     switch (ec) {
                         case 0:
                             printf("= ");
@@ -413,12 +427,25 @@ void repl(ParseResult* parse_res) {
                 }
                 break;
             case ErrorAt:
-                if (parse_res->position == len) {
+                if (parse_res.position == len) {
                     strcpy(carry, str);
                 } else {
-                    printf("! parse error at position %d\n", parse_res->position);
+                    printf("! parse error at position %d\n", parse_res.position);
                 }
                 break;
         }
     }
+}
+
+// debug
+void print_Env(Binding env[]) {
+    char buffer[200];
+    int i;
+    for (i=0; i < ENV_SIZE; i++) {
+        if (!env[i].valid) { break; }
+        buffer[0] = '\0';
+        showSexp(env[i].value, buffer);
+        printf("%s = %s\n", env[i].name, buffer);
+    }
+    printf("length: %d\n", i);
 }

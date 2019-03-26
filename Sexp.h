@@ -79,6 +79,6 @@ void readSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse
 void readQuoteSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
 void readClose (char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
 
-// Debugging
+// debug
 void print_Sexp(Sexp* s);
 #endif

@@ -1,0 +1,8 @@
+(define    car (lambda ((a . d)) a))
+(define    cdr (lambda ((a . d)) d))
+(define   caar (lambda (((aa . da) . d)) aa))
+(define   cadr (lambda ((a ad . dd)) ad))
+(define   cdar (lambda (((aa . da) . d)) da))
+(define   cddr (lambda ((a ad . dd)) dd))
+(define   list (lambda l l))
+(define append (lambda (() bs) bs ((a . as) bs) (cons a (appendd as bs))))
