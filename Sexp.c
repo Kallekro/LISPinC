@@ -85,6 +85,49 @@ void showTail (Sexp* s, char* result) {
     }
 }
 
+void init_heapblock(HeapBlock* heapblock) {
+    heapblock->nextBlock = 0;
+    heapblock->objects = malloc(HEAP_BLOCK_SIZE * sizeof(Sexp*));
+    for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+        heapblock->objects[i] = malloc(sizeof(Sexp));
+        heapblock->objects[i]->memflag = 0;
+    }
+}
+
+void free_heapblock(HeapBlock* heapblock) {
+    for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+        if (heapblock->objects[i]->memflag != 0) {
+            total_bytes_freed += sizeof(Sexp);
+        }
+        free(heapblock->objects[i]);
+    }
+    free(heapblock->objects);
+    if (heapblock->nextBlock != 0) {
+        free_heapblock(heapblock->nextBlock);
+        free(heapblock->nextBlock);
+    }
+}
+
+void create_heap() {
+    HeapSize = HEAP_BLOCK_SIZE;
+    init_heapblock(&Heap);
+}
+
+void delete_heap() {
+    free_heapblock(&Heap);
+}
+
+HeapBlock* allocate_heap_block() {
+    printf("Allocating new heap block\n");
+    HeapBlock* current_block = &Heap;
+    while (current_block->nextBlock != 0) { current_block = current_block->nextBlock; }
+    current_block->nextBlock = malloc(sizeof(HeapBlock));
+    init_heapblock(current_block->nextBlock);
+    HeapSize += HEAP_BLOCK_SIZE;
+    total_heapblocks_allocated++;
+    return current_block->nextBlock;
+}
+
 void mark(Sexp* node) {
     if (node->memflag == 0) { return; }
     node->memflag = 2;
@@ -94,67 +137,68 @@ void mark(Sexp* node) {
     }
 }
 
+
 int mark_and_sweep(RootSet* rootSet) {
-    for (int i=0; i < HEAP_SIZE; i++) {
-        if (Heap[i].memflag == 2) {
-            Heap[i].memflag = 1;
-        }
-        //else if (Heap[i].memflag != 1 && Heap[i].memflag != 0) {
-        //    Heap[i].memflag = 0;
-        //}
-    }
+    HeapBlock* current_block = &Heap;
     int objects_freed = 0;
-    for (int i=0; i < rootSet->length; i++) {
-        mark(rootSet->set[i]);
-    }
-    for (int i=0; i < HEAP_SIZE; i++) {
-        if (Heap[i].memflag == 2) {
-            Heap[i].memflag = 1;
+    while (current_block != 0) {
+        for (int i=0; i < rootSet->length; i++) {
+            mark(rootSet->set[i]);
         }
-        else if (Heap[i].memflag == 1) {
-            Heap[i].memflag = 0;
-            total_bytes_freed += sizeof(Sexp);
-            objects_freed++;
+        for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+            if (current_block->objects[i]->memflag == 1) {
+                current_block->objects[i]->memflag = 0;
+                total_bytes_freed += sizeof(Sexp);
+                objects_freed++;
+            }
         }
+        current_block = current_block->nextBlock;
     }
+    clear_marks();
     total_garbage_collections++;
     printf("garbage collection triggered\n");
     printf("objects freed: %d\n", objects_freed);
     return objects_freed;
 }
 
-void clear_heap() {
-    for (int i=0; i < HEAP_SIZE; i++) {
-        Heap[i].memflag = 0;
-    }
-}
-
-void construct_rootSet(RootSet* rootSet) {
-    rootSet->set[0] = 0;
-    rootSet->length = 0;
-}
-
-Sexp* _allocate(RootSet* rootSet) {
-    for (int i=0; i < HEAP_SIZE; i++) {
-        if (Heap[i].memflag == 0) {
-            total_bytes_allocated += sizeof(Sexp);
-            (&Heap[i])->memflag = 1;
-            rootSet->set[rootSet->length] = &Heap[i];
-            rootSet->length++;
-            return &Heap[i];
+void clear_marks() {
+    HeapBlock* current_block = &Heap;
+    while (current_block != 0) {
+        for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+            if (current_block->objects[i]->memflag == 2) {
+                current_block->objects[i]->memflag = 1;
+            }
         }
+        current_block = current_block->nextBlock;
     }
+}
+
+Sexp* _allocate(RootSet* rootSet, HeapBlock* start_block) {
+    HeapBlock* current_block = start_block;
+    while (current_block != 0) {
+        for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
+            if (current_block->objects[i]->memflag == 0) {
+                total_bytes_allocated += sizeof(Sexp);
+                current_block->objects[i]->memflag = 1;
+                rootSet->set[rootSet->length] = current_block->objects[i];
+                rootSet->length++;
+                return current_block->objects[i];
+            }
+        }
+        current_block = current_block->nextBlock;
+    }
+
     return 0;
 }
 
 Sexp* allocate_Sexp(RootSet* rootSet) {
-    Sexp* new_alloc = _allocate(rootSet);
+    Sexp* new_alloc = _allocate(rootSet, &Heap);
     if (new_alloc != 0) { return new_alloc; }
     if (mark_and_sweep(rootSet) < 1) {
-        printf("Fatal error: out of memory. Consider increasing heap size (HEAP_SIZE).\n");
-        exit(1);
+        HeapBlock* new_block = allocate_heap_block();
+        _allocate(rootSet, new_block);
     }
-    return _allocate(rootSet);
+    return _allocate(rootSet, &Heap);
 }
 
 
@@ -169,6 +213,11 @@ int allocate_n_Sexp(Sexp* rootSet[], int n, Sexp* output[]) {
     }
     if (mark_and_sweep(rootSet))
 }*/
+
+void construct_rootSet(RootSet* rootSet) {
+    rootSet->set[0] = 0;
+    rootSet->length = 0;
+}
 
 void appendSet(Sexp* set[], Sexp* s) {
     int i=0;
@@ -231,7 +280,7 @@ void readExp(char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* ro
         return;
     }
     if ('a' <= cs[i] && 'z' >= cs[i]) {
-        readSymbol(cs, i, len, parse_res);
+        readSymbol(cs, i, len, parse_res, rootSet);
     }
     else if (cs[i] == '(') {
         readTail(cs, i+1, len, parse_res, rootSet);
@@ -262,7 +311,7 @@ void readExp(char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* ro
     }
 }
 
-void readSymbol(char* cs, size_t i, size_t len, ParseResult* parse_res) {
+void readSymbol(char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet) {
     char name[MAX_SYMBOL_LENGTH];
     size_t name_idx = 0;
     name[name_idx] = cs[i];
@@ -274,6 +323,7 @@ void readSymbol(char* cs, size_t i, size_t len, ParseResult* parse_res) {
         }
     }
     name[name_idx+1] = '\0';
+    parse_res->success_Sexp = allocate_Sexp(rootSet);
     construct_PR_success(
         parse_res, i,
         construct_symbol(parse_res->success_Sexp, name)
@@ -290,13 +340,14 @@ void readTail(char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* r
     }
     Sexp* s0;
     if (cs[i] == ')') {
+        parse_res->success_Sexp = allocate_Sexp(rootSet);
         construct_PR_success(
             parse_res, i+1,
             construct_nil(parse_res->success_Sexp)
         );
     }
     else if ('a' <= cs[i] && 'z' >= cs[i]) {
-        readSymbol(cs, i, len, parse_res);
+        readSymbol(cs, i, len, parse_res, rootSet);
         switch (parse_res->kind) {
             case Success:
                 s0 = allocate_Sexp(rootSet);

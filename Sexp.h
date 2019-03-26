@@ -8,7 +8,7 @@
 #define MAX_DISPLAY_SEXP 200
 #define MAX_FILE_NAME 100
 
-#define HEAP_SIZE 1000
+#define HEAP_BLOCK_SIZE 100
 #define ENV_SIZE 100
 
 enum Sexp_kind {
@@ -63,17 +63,31 @@ ParseResult* construct_PR_success(ParseResult* p, unsigned int position, Sexp* s
 ParseResult* construct_PR_error(ParseResult* p, unsigned int position);
 ParseResult* construct_PR_empty(ParseResult* p, Sexp* s);
 
-Sexp Heap[HEAP_SIZE];
+typedef struct HeapBlock HeapBlock;
+struct HeapBlock {
+    Sexp** objects;
+    HeapBlock* nextBlock;
+};
+
+HeapBlock Heap;
+size_t HeapSize;
 unsigned int total_bytes_allocated;
 unsigned int total_bytes_freed;
 unsigned int total_garbage_collections;
-void clear_heap();
+unsigned int total_heapblocks_allocated;
+void init_heapblock(HeapBlock* heapblock);
+void free_heapblock(HeapBlock* heapblock);
+void create_heap();
+void delete_heap();
+HeapBlock* allocate_heap_block();
 Sexp* allocate_Sexp(RootSet* rootSet);
-
+void mark(Sexp* node);
+int mark_and_sweep(RootSet* rootSet);
+void clear_marks();
 
 void readSexp (char* cs, ParseResult* parse_res, RootSet* rootSet);
 void readExp (char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
-void readSymbol (char* cs, size_t i, size_t len, ParseResult* parse_res);
+void readSymbol(char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
 void readTail (char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
 void readSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
 void readQuoteSexpAndTail(Sexp* s, char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);

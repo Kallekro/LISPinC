@@ -378,10 +378,11 @@ void quoteExp(Sexp* v, char output[]) {
 }
 
 void repl() {
-    clear_heap();
+    create_heap();
     init_env(globalEnv);
     total_bytes_allocated = 0;
     total_garbage_collections = 0;
+    total_heapblocks_allocated = 1;
     ParseResult parse_res;
     Sexp parse_s_exp;
     construct_PR_empty(&parse_res, &parse_s_exp);
@@ -435,6 +436,7 @@ void repl() {
                 break;
         }
     }
+    delete_heap();
 }
 
 // debug

@@ -1,6 +1,5 @@
 // TODO:
-//      * garbage collection
-//      !!!* constructing unallocated should never happen as error should be thrown earlier!!!
+//      * dynamically growing environments
 //      * update should throw error like others
 //      * reduce amount of allocations of s_out
 //      * don't get root set if no garbage collection required
@@ -12,7 +11,9 @@
 //      DONE   * save/load
 //      DONE   ** !!need to consider local environment when parsing also!!
 //      DONE   * why does append not work?
-
+//      DONE   * dynamically growing heap
+//      DONE   * garbage collection
+//      DONE   !!!* constructing unallocated should never happen as error should be thrown earlier!!!
 #include "Sexp.h"
 #include "RunLISP.h"
 
@@ -24,9 +25,10 @@ int main() {
     printf("\n");
     for (int i=0; i < 40; i++) { printf("-"); }
     printf("\nS-expression size: %ld bytes\n", sizeof(Sexp));
-    printf("Total heap size: %ld bytes\n", sizeof(Heap));
-    printf("\nTotal bytes allocated: %u\n", total_bytes_allocated);
-    printf("Total bytes freed: %u\n", total_bytes_freed);
+    printf("Total heap size: %ld bytes\n", sizeof(Sexp) * HeapSize);
+    printf("\nTotal bytes allocated on heap: %u\n", total_bytes_allocated);
+    printf("Total bytes freed on heap: %u\n", total_bytes_freed);
     printf("Total garbage collections: %u\n", total_garbage_collections);
+    printf("Total heap blocks allocated: %u\n", total_heapblocks_allocated);
     return 0;
 }
