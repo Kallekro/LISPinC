@@ -8,13 +8,13 @@
 #define MAX_DISPLAY_SEXP 400
 #define MAX_FILE_NAME 100
 
-#define HEAP_BLOCK_SIZE 500
-#define ENV_SIZE 10000
+#define HEAP_BLOCK_SIZE 300
+#define ENV_SIZE 1000
 
+typedef enum Sexp_kind Sexp_kind;
 enum Sexp_kind {
     Symbol, Nil, Cons
 };
-typedef enum Sexp_kind Sexp_kind;
 
 typedef struct Sexp Sexp;
 struct Sexp {
@@ -36,8 +36,6 @@ Sexp* construct_symbol(Sexp* s, char* name);
 Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2);
 Sexp* copy_Sexp(Sexp* dest, Sexp* src);
 
-void showSexp (Sexp* s, char* result);
-void showTail (Sexp* s, char* result);
 
 typedef struct RootSet RootSet;
 struct RootSet {
@@ -46,7 +44,6 @@ struct RootSet {
 };
 
 void construct_rootSet(RootSet* rootSet);
-void copy_set(RootSet* dest, RootSet* src);
 
 enum ParseResult_kind {
     Success, ErrorAt, Empty
@@ -74,6 +71,7 @@ HeapBlock Heap;
 size_t HeapSize;
 size_t total_bytes_allocated;
 size_t total_bytes_freed;
+size_t bytes_freed_GC;
 size_t total_garbage_collections;
 size_t total_heapblocks_allocated;
 void init_heapblock(HeapBlock* heapblock);
@@ -84,8 +82,9 @@ HeapBlock* allocate_heap_block();
 Sexp* allocate_Sexp(RootSet* rootSet);
 void mark(Sexp* node);
 int mark_and_sweep(RootSet* rootSet);
-void clear_marks();
 
+void showSexp (Sexp* s, char* result);
+void showTail (Sexp* s, char* result);
 void readSexp (char* cs, ParseResult* parse_res, RootSet* rootSet);
 void readExp (char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);
 void readSymbol(char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet* rootSet);

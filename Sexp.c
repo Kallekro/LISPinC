@@ -140,34 +140,26 @@ void mark(Sexp* node) {
 int mark_and_sweep(RootSet* rootSet) {
     HeapBlock* current_block = &Heap;
     int objects_freed = 0;
+    // mark
     for (size_t i=0; i < rootSet->length; i++) {
         mark(rootSet->set[i]);
     }
+    // sweep
     while (current_block != 0) {
         for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
             if (current_block->objects[i]->memflag == 1) {
                 current_block->objects[i]->memflag = 0;
-                total_bytes_freed += sizeof(Sexp);
+                bytes_freed_GC += sizeof(Sexp);
                 objects_freed++;
             }
-        }
-        current_block = current_block->nextBlock;
-    }
-    clear_marks();
-    total_garbage_collections++;
-    return objects_freed;
-}
-
-void clear_marks() {
-    HeapBlock* current_block = &Heap;
-    while (current_block != 0) {
-        for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
-            if (current_block->objects[i]->memflag == 2) {
+            else if (current_block->objects[i]->memflag == 2) {
                 current_block->objects[i]->memflag = 1;
             }
         }
         current_block = current_block->nextBlock;
     }
+    total_garbage_collections++;
+    return objects_freed;
 }
 
 Sexp* _allocate(RootSet* rootSet, HeapBlock* start_block) {
@@ -188,14 +180,11 @@ Sexp* _allocate(RootSet* rootSet, HeapBlock* start_block) {
 }
 
 Sexp* allocate_Sexp(RootSet* rootSet) {
-    RootSet orig_rootset;
-    copy_set(&orig_rootset, rootSet);
     Sexp* new_alloc = _allocate(rootSet, &Heap);
     if (new_alloc != 0) { return new_alloc; }
-    copy_set(rootSet, &orig_rootset);
     if (mark_and_sweep(rootSet) < 1) {
         HeapBlock* new_block = allocate_heap_block();
-        _allocate(rootSet, &Heap);
+        _allocate(rootSet, new_block);
     }
     return _allocate(rootSet, &Heap);
 }
@@ -203,13 +192,6 @@ Sexp* allocate_Sexp(RootSet* rootSet) {
 void construct_rootSet(RootSet* rootSet) {
     rootSet->set[0] = 0;
     rootSet->length = 0;
-}
-
-void copy_set(RootSet* dest, RootSet* src) {
-    for (size_t i=0; i < src->length; i++) {
-        dest->set[i] = src->set[i];
-    }
-    dest->length = src->length;
 }
 
 ParseResult* construct_PR_success(ParseResult* p, unsigned int position, Sexp* s) {

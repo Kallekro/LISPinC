@@ -28,7 +28,8 @@ int main() {
     printf("Heap blocks allocated: %lu\n", total_heapblocks_allocated);
     printf("Total heap size: %ld bytes\n", sizeof(Sexp) * HeapSize);
     printf("\nTotal bytes allocated on heap: %lu\n", total_bytes_allocated);
-    printf("Total bytes freed from heap: %lu\n", total_bytes_freed);
+    printf("Total bytes freed from heap: %lu\n", total_bytes_freed + bytes_freed_GC);
+    printf("Bytes freed during garbage collection: %lu\n", bytes_freed_GC);
     printf("Total garbage collections: %lu\n", total_garbage_collections);
     return 0;
 }

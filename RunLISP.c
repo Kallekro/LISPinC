@@ -4,6 +4,15 @@ const char keywords[KEYWORDS_C][MAX_SYMBOL_LENGTH] = {
     "quote", "lambda", "define", "cons", "save", "load"
 };
 
+void init_core() {
+    create_heap();
+    init_env(globalEnv);
+    total_bytes_allocated = 0;
+    bytes_freed_GC = 0;
+    total_garbage_collections = 0;
+    total_heapblocks_allocated = 1;
+}
+
 void init_env(Binding env[]) {
     for (size_t i=0; i < ENV_SIZE; i++) {
         env[i].valid = 0;
@@ -374,22 +383,20 @@ void quoteExp(Sexp* v, char output[]) {
         showSexp(v, output);
     } else {
         char tmp_out[MAX_DISPLAY_SEXP];
-        tmp_out[0] = '\0';
+        tmp_out[0] = '0';
         showSexp(v, tmp_out);
         sprintf(output, "(quote %s)", tmp_out);
     }
 }
 
 void repl() {
-    create_heap();
-    init_env(globalEnv);
-    total_bytes_allocated = 0;
-    total_garbage_collections = 0;
-    total_heapblocks_allocated = 1;
+    init_core();
+    // parse res
     ParseResult parse_res;
-    //Sexp* parse_s_exp;
+    // local env
     Binding localEnv[ENV_SIZE];
     init_env(localEnv);
+    // root set
     RootSet rootSet;
     construct_rootSet(&rootSet);
     char input_buffer[200];
