@@ -5,11 +5,11 @@
 #include <string.h>
 
 #define MAX_SYMBOL_LENGTH 30
-#define MAX_DISPLAY_SEXP 200
+#define MAX_DISPLAY_SEXP 400
 #define MAX_FILE_NAME 100
 
-#define HEAP_BLOCK_SIZE 100
-#define ENV_SIZE 100
+#define HEAP_BLOCK_SIZE 500
+#define ENV_SIZE 10000
 
 enum Sexp_kind {
     Symbol, Nil, Cons
@@ -32,7 +32,7 @@ struct Sexp {
 };
 
 Sexp* construct_nil(Sexp* s);
-Sexp* construct_symbol(Sexp* s, char name[MAX_SYMBOL_LENGTH]);
+Sexp* construct_symbol(Sexp* s, char* name);
 Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2);
 Sexp* copy_Sexp(Sexp* dest, Sexp* src);
 
@@ -41,11 +41,12 @@ void showTail (Sexp* s, char* result);
 
 typedef struct RootSet RootSet;
 struct RootSet {
-    Sexp* set[ENV_SIZE*2];
+    Sexp* set[ENV_SIZE*4];
     size_t length;
 };
 
 void construct_rootSet(RootSet* rootSet);
+void copy_set(RootSet* dest, RootSet* src);
 
 enum ParseResult_kind {
     Success, ErrorAt, Empty
@@ -71,10 +72,10 @@ struct HeapBlock {
 
 HeapBlock Heap;
 size_t HeapSize;
-unsigned int total_bytes_allocated;
-unsigned int total_bytes_freed;
-unsigned int total_garbage_collections;
-unsigned int total_heapblocks_allocated;
+size_t total_bytes_allocated;
+size_t total_bytes_freed;
+size_t total_garbage_collections;
+size_t total_heapblocks_allocated;
 void init_heapblock(HeapBlock* heapblock);
 void free_heapblock(HeapBlock* heapblock);
 void create_heap();
@@ -95,4 +96,7 @@ void readClose (char* cs, size_t i, size_t len, ParseResult* parse_res, RootSet*
 
 // debug
 void print_Sexp(Sexp* s);
+void print_rootSet(RootSet* rootSet);
+
+
 #endif

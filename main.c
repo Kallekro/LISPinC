@@ -1,5 +1,4 @@
 // TODO:
-//      * dynamically growing environments
 //      * update should throw error like others
 //      * reduce amount of allocations of s_out
 //      * don't get root set if no garbage collection required
@@ -25,10 +24,11 @@ int main() {
     printf("\n");
     for (int i=0; i < 40; i++) { printf("-"); }
     printf("\nS-expression size: %ld bytes\n", sizeof(Sexp));
+    printf("Heap block size: %u objects\n", HEAP_BLOCK_SIZE);
+    printf("Heap blocks allocated: %lu\n", total_heapblocks_allocated);
     printf("Total heap size: %ld bytes\n", sizeof(Sexp) * HeapSize);
-    printf("\nTotal bytes allocated on heap: %u\n", total_bytes_allocated);
-    printf("Total bytes freed on heap: %u\n", total_bytes_freed);
-    printf("Total garbage collections: %u\n", total_garbage_collections);
-    printf("Total heap blocks allocated: %u\n", total_heapblocks_allocated);
+    printf("\nTotal bytes allocated on heap: %lu\n", total_bytes_allocated);
+    printf("Total bytes freed from heap: %lu\n", total_bytes_freed);
+    printf("Total garbage collections: %lu\n", total_garbage_collections);
     return 0;
 }

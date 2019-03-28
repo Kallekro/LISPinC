@@ -8,7 +8,7 @@ Sexp* construct_nil(Sexp* s) {
     return s;
 }
 
-Sexp* construct_symbol(Sexp* s, char name[MAX_SYMBOL_LENGTH]) {
+Sexp* construct_symbol(Sexp* s, char* name) {
     if (s->memflag == 0) {
         printf("Constructing unallocated Symbol S-expression.\n");
     }
@@ -30,7 +30,6 @@ Sexp* construct_cons(Sexp* s, Sexp* s1, Sexp* s2) {
 
 Sexp* copy_Sexp(Sexp* dest, Sexp* src) {
     dest->kind = src->kind;
-    //dest->memflag = src->memflag;
     switch (src->kind) {
         case Symbol:
             strcpy(dest->u.symbol.name, src->u.symbol.name);
@@ -88,14 +87,16 @@ void showTail (Sexp* s, char* result) {
 void init_heapblock(HeapBlock* heapblock) {
     heapblock->nextBlock = 0;
     heapblock->objects = malloc(HEAP_BLOCK_SIZE * sizeof(Sexp*));
-    for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+    for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
         heapblock->objects[i] = malloc(sizeof(Sexp));
+        heapblock->objects[i]->memflag = 1;
+        construct_nil(heapblock->objects[i]);
         heapblock->objects[i]->memflag = 0;
     }
 }
 
 void free_heapblock(HeapBlock* heapblock) {
-    for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+    for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
         if (heapblock->objects[i]->memflag != 0) {
             total_bytes_freed += sizeof(Sexp);
         }
@@ -118,7 +119,6 @@ void delete_heap() {
 }
 
 HeapBlock* allocate_heap_block() {
-    printf("Allocating new heap block\n");
     HeapBlock* current_block = &Heap;
     while (current_block->nextBlock != 0) { current_block = current_block->nextBlock; }
     current_block->nextBlock = malloc(sizeof(HeapBlock));
@@ -129,7 +129,7 @@ HeapBlock* allocate_heap_block() {
 }
 
 void mark(Sexp* node) {
-    if (node->memflag == 0) { return; }
+    if (node == 0 || node->memflag == 0 || node->memflag == 2) { return; }
     node->memflag = 2;
     if (node->kind == Cons) {
         mark(node->u.cons.Sexp1);
@@ -137,15 +137,14 @@ void mark(Sexp* node) {
     }
 }
 
-
 int mark_and_sweep(RootSet* rootSet) {
     HeapBlock* current_block = &Heap;
     int objects_freed = 0;
+    for (size_t i=0; i < rootSet->length; i++) {
+        mark(rootSet->set[i]);
+    }
     while (current_block != 0) {
-        for (int i=0; i < rootSet->length; i++) {
-            mark(rootSet->set[i]);
-        }
-        for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+        for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
             if (current_block->objects[i]->memflag == 1) {
                 current_block->objects[i]->memflag = 0;
                 total_bytes_freed += sizeof(Sexp);
@@ -156,15 +155,13 @@ int mark_and_sweep(RootSet* rootSet) {
     }
     clear_marks();
     total_garbage_collections++;
-    printf("garbage collection triggered\n");
-    printf("objects freed: %d\n", objects_freed);
     return objects_freed;
 }
 
 void clear_marks() {
     HeapBlock* current_block = &Heap;
     while (current_block != 0) {
-        for (int i=0; i < HEAP_BLOCK_SIZE; i++) {
+        for (size_t i=0; i < HEAP_BLOCK_SIZE; i++) {
             if (current_block->objects[i]->memflag == 2) {
                 current_block->objects[i]->memflag = 1;
             }
@@ -187,47 +184,32 @@ Sexp* _allocate(RootSet* rootSet, HeapBlock* start_block) {
         }
         current_block = current_block->nextBlock;
     }
-
     return 0;
 }
 
 Sexp* allocate_Sexp(RootSet* rootSet) {
+    RootSet orig_rootset;
+    copy_set(&orig_rootset, rootSet);
     Sexp* new_alloc = _allocate(rootSet, &Heap);
     if (new_alloc != 0) { return new_alloc; }
+    copy_set(rootSet, &orig_rootset);
     if (mark_and_sweep(rootSet) < 1) {
         HeapBlock* new_block = allocate_heap_block();
-        _allocate(rootSet, new_block);
+        _allocate(rootSet, &Heap);
     }
     return _allocate(rootSet, &Heap);
 }
-
-
-// TODO:
-/*
-int allocate_n_Sexp(Sexp* rootSet[], int n, Sexp* output[]) {
-    for (int i=0; i < n; i++) {
-        output[i] = _allocate(rootSet);
-        if (output[i] == 0) {
-            break;
-        }
-    }
-    if (mark_and_sweep(rootSet))
-}*/
 
 void construct_rootSet(RootSet* rootSet) {
     rootSet->set[0] = 0;
     rootSet->length = 0;
 }
 
-void appendSet(Sexp* set[], Sexp* s) {
-    int i=0;
-    while (set[i++] != 0) {
-        if (i >= ENV_SIZE) {
-            printf("Fatal error: stack overflow. Consider increasing environment size (ENV_SIZE).");
-            exit(1);
-        }
+void copy_set(RootSet* dest, RootSet* src) {
+    for (size_t i=0; i < src->length; i++) {
+        dest->set[i] = src->set[i];
     }
-    set[i] = s;
+    dest->length = src->length;
 }
 
 ParseResult* construct_PR_success(ParseResult* p, unsigned int position, Sexp* s) {
@@ -251,7 +233,7 @@ ParseResult* construct_PR_empty(ParseResult* p, Sexp* s) {
 void readSexp (char* cs, ParseResult* parse_res, RootSet* rootSet) {
     size_t len = strlen(cs);
     size_t j = 0;
-
+    Sexp* s_res;
     readExp(cs, 0, len, parse_res, rootSet);
     switch (parse_res->kind) {
         case Success:
@@ -260,8 +242,10 @@ void readSexp (char* cs, ParseResult* parse_res, RootSet* rootSet) {
             while (j < len && (cs[j] == ' ' || cs[j] == '\n')) {
                 j++;
             }
+            s_res = allocate_Sexp(rootSet);
+            copy_Sexp(s_res, parse_res->success_Sexp);
             construct_PR_success(parse_res, (j == len) ? 0 : j,
-                                 parse_res->success_Sexp);
+                                 s_res);
             break;
         case ErrorAt:
             construct_PR_error(parse_res, parse_res->position);
@@ -474,4 +458,11 @@ void print_Sexp(Sexp* s) {
     buffer[0] = '\0';
     showSexp(s, buffer);
     printf("%s\n", buffer);
+}
+
+void print_rootSet(RootSet* rootSet) {
+    for (size_t i=0; i < rootSet->length; i++) {
+        printf("%lu = ", i);
+        print_Sexp(rootSet->set[i]);
+    }
 }
