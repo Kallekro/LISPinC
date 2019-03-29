@@ -2,6 +2,8 @@
 #define RUNLISP_H
 #include "Sexp.h"
 
+#define TESTMODE 1
+
 typedef struct Binding Binding;
 struct Binding {
     int valid;

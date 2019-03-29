@@ -8,7 +8,7 @@
 #define MAX_DISPLAY_SEXP 400
 #define MAX_FILE_NAME 100
 
-#define HEAP_BLOCK_SIZE 300
+#define HEAP_BLOCK_SIZE 500
 #define ENV_SIZE 1000
 
 typedef enum Sexp_kind Sexp_kind;

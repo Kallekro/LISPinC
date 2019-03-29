@@ -184,6 +184,8 @@ int evaluate_cons(Sexp* s_in, Sexp** s_out, Binding localEnv[], char err_msg[]) 
         && s2->u.cons.Sexp2->kind == Nil) {
             // lower carbon emissions
             if (saveGlobalEnvironment(s2->u.cons.Sexp1->u.symbol.name, err_msg) != 0) { return 1; }
+            *s_out = safe_allocate(localEnv);
+            construct_nil(*s_out);
             return 0;
         }
         else if (strcmp(s1->u.symbol.name, "load") == 0
@@ -320,7 +322,7 @@ int saveGlobalEnvironment(char* fname, char err_msg[]) {
     }
     char valbuf[MAX_DISPLAY_SEXP];
     for (size_t i=0; i < ENV_SIZE; i++) {
-        valbuf[0] = 0;
+        valbuf[0] = '\0';
         if (!globalEnv[i].valid) { break; }
         quoteExp(globalEnv[i].value, valbuf);
         fprintf(fp, "(define %s %s)\n", globalEnv[i].name, valbuf);
@@ -383,7 +385,7 @@ void quoteExp(Sexp* v, char output[]) {
         showSexp(v, output);
     } else {
         char tmp_out[MAX_DISPLAY_SEXP];
-        tmp_out[0] = '0';
+        tmp_out[0] = '\0';
         showSexp(v, tmp_out);
         sprintf(output, "(quote %s)", tmp_out);
     }
@@ -415,10 +417,8 @@ void repl() {
         strcat(str, input_buffer);
         carry[0] = '\0';
         size_t len = strlen(str);
-        //parse_s_exp = safe_allocate(localEnv);
-        //construct_PR_empty(&parse_res, parse_s_exp);
         get_root_set(globalEnv, 0, &rootSet);
-        //rootSet.set[rootSet.length++] = parse_s_exp;
+        if (TESTMODE) { printf("%s", str); }
         readSexp(str, &parse_res, &rootSet);
         rootSet.set[rootSet.length++] = parse_res.success_Sexp;
         switch (parse_res.kind) {
